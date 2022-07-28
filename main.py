@@ -13,17 +13,21 @@ logging.basicConfig(level=logging.INFO)
 log = logging.getLogger('ortomon_ws')
 
 
-def task(client: mqtt.Client, topic: str):
-    data = dict(wind=automationhat.analog.one.read(),
-                direction=random.randint(0, 100))
+def task(client: mqtt.Client, topic: str, wind_factor: float):
+    data = dict(wind=int(automationhat.analog.one.read() * wind_factor),
+                direction=random.randint(0, 5))
     client.publish(topic, json.dumps(data))
-    log.info("Message published on topic \"{}\"".format(topic))
+    log.info('Message published on topic "{}"'.format(topic))
 
 
-def on_connect(scheduler: BackgroundScheduler, topic, client, _userdata, _flags, rc):
+def on_connect(scheduler: BackgroundScheduler, config: dict, client, _userdata, _flags, rc):
     if rc == 0:
         log.info("Connected to MQTT broker")
-        scheduler.add_job(functools.partial(task, client, topic), 'interval', seconds=5, name='publisher')
+        fn = functools.partial(task, client,
+                               config['mqtt']['topic'],
+                               float(config['wind']['factor']))
+        scheduler.add_job(fn, 'interval', seconds=int(config['mqtt']['interval']),
+                          name='publisher')
         scheduler.start()
     else:
         log.error("Failed to connect, return code %d\n", rc)
@@ -34,14 +38,14 @@ def connect_mqtt(scheduler: BackgroundScheduler) -> mqtt.Client:
     config = configparser.ConfigParser()
     config.read(config_dir.joinpath('config.ini'))
 
-    client = mqtt.Client(config['DEFAULT']['client_id'])
-    client.tls_set(ca_certs=config['DEFAULT']['ca_certs'],
-                   certfile=config['DEFAULT']['cert_file'],
-                   keyfile=config['DEFAULT']['key_file'])
+    client = mqtt.Client(config['mqtt']['client_id'])
+    client.tls_set(ca_certs=config['mqtt']['ca_certs'],
+                   certfile=config['mqtt']['cert_file'],
+                   keyfile=config['mqtt']['key_file'])
     client.tls_insecure_set(False)
 
-    client.on_connect = functools.partial(on_connect, scheduler, config['DEFAULT']['topic'])
-    client.connect(config['DEFAULT']['broker'], int(config['DEFAULT']['port']))
+    client.on_connect = functools.partial(on_connect, scheduler, config)
+    client.connect(config['mqtt']['broker'], int(config['mqtt']['port']))
 
     return client
 

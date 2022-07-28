@@ -5,7 +5,7 @@ import logging
 from paho.mqtt import client as mqtt
 from pathlib import Path
 from apscheduler.schedulers.background import BackgroundScheduler
-# import automationhat
+import automationhat
 import json
 import configparser
 
@@ -14,9 +14,7 @@ log = logging.getLogger('ortomon_ws')
 
 
 def task(client: mqtt.Client, topic: str):
-    # data = dict(wind=automationhat.analog.one.read(),
-    #             direction=0)
-    data = dict(wind=random.randint(0, 300),
+    data = dict(wind=automationhat.analog.one.read(),
                 direction=random.randint(0, 100))
     client.publish(topic, json.dumps(data))
     log.info("Message published on topic \"{}\"".format(topic))
